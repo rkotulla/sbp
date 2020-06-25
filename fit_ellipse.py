@@ -9,16 +9,29 @@ import pandas
 import photutils
 import photutils.isophote
 from astropy.io import votable
+import argparse
 
 print(photutils.__path__)
 
 if __name__ == "__main__":
 
-    fn = sys.argv[1]
-    catalog_fn = sys.argv[2]
-    source_id = int(sys.argv[3])
-    segm_fn = sys.argv[4]
-    output_basename = sys.argv[5]
+    cmdline = argparse.ArgumentParser()
+    cmdline.add_argument("-o", "--output", dest="output_basename", type=str,
+                         default="sbptest",
+                         help="base filename for all output")
+    cmdline.add_argument("-r", "--rerun", dest='rerun', default=False, action='store_true',
+                         help="rerun using profile generated in prior run")
+    cmdline.add_argument("input_fn", help="input image")
+    cmdline.add_argument("catalog_fn", help='catalog filename [must on VOTable format]')
+    cmdline.add_argument("source_id", type=int, help='source id from sextractor')
+    cmdline.add_argument("segmentation_fn", help="filename of segmentation frame")
+    args = cmdline.parse_args()
+
+    fn = args.input_fn #sys.argv[1]
+    catalog_fn = args.catalog_fn #sys.argv[2]
+    source_id = args.source_id #int(sys.argv[3])
+    segm_fn = args.segmentation_fn #sys.argv[4]
+    output_basename = args.output_basename #sys.argv[5]
 
     # read image
     img_hdu = pyfits.open(fn)
@@ -42,7 +55,7 @@ if __name__ == "__main__":
 
     # sys.exit(-1)
 
-    rerun = True
+    rerun = args.rerun
     surfprofile_csv = output_basename + "_profile.csv"
 
     if (rerun and os.path.isfile(surfprofile_csv)):
