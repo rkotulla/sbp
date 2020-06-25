@@ -27,11 +27,11 @@ if __name__ == "__main__":
     cmdline.add_argument("segmentation_fn", help="filename of segmentation frame")
     args = cmdline.parse_args()
 
-    fn = args.input_fn #sys.argv[1]
-    catalog_fn = args.catalog_fn #sys.argv[2]
-    source_id = args.source_id #int(sys.argv[3])
-    segm_fn = args.segmentation_fn #sys.argv[4]
-    output_basename = args.output_basename #sys.argv[5]
+    fn = args.input_fn
+    catalog_fn = args.catalog_fn
+    source_id = args.source_id
+    segm_fn = args.segmentation_fn
+    output_basename = args.output_basename
 
     # read image
     img_hdu = pyfits.open(fn)
