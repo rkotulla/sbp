@@ -11,8 +11,6 @@ import photutils.isophote
 from astropy.io import votable
 import argparse
 
-print(photutils.__path__)
-
 if __name__ == "__main__":
 
     cmdline = argparse.ArgumentParser()
