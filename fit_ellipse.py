@@ -14,15 +14,29 @@ import argparse
 if __name__ == "__main__":
 
     cmdline = argparse.ArgumentParser()
+    #
+    # required parameters
+    #
+    cmdline.add_argument("input_fn", help="input image")
+    cmdline.add_argument("catalog_fn", help='catalog filename [must on VOTable format]')
+    cmdline.add_argument("source_id", type=int, help='source id from sextractor')
+    cmdline.add_argument("segmentation_fn", help="filename of segmentation frame")
+    #
+    # optional parameters
+    #
     cmdline.add_argument("-o", "--output", dest="output_basename", type=str,
                          default="sbptest",
                          help="base filename for all output")
     cmdline.add_argument("-r", "--rerun", dest='rerun', default=False, action='store_true',
                          help="rerun using profile generated in prior run")
-    cmdline.add_argument("input_fn", help="input image")
-    cmdline.add_argument("catalog_fn", help='catalog filename [must on VOTable format]')
-    cmdline.add_argument("source_id", type=int, help='source id from sextractor')
-    cmdline.add_argument("segmentation_fn", help="filename of segmentation frame")
+    #
+    # optional parameters affecting ellipse fitting and profile generation
+    #
+    cmdline.add_argument("--minsma", dest='minsma', default=0, type=float,
+                         help="minimum semi-major axis length (default: 0.0 pixels)")
+    cmdline.add_argument("--maxsma", dest='maxsma', default=None, type=float,
+                         help="maximum semi-major axis length (default: no maximum)")
+
     args = cmdline.parse_args()
 
     fn = args.input_fn
@@ -45,11 +59,11 @@ if __name__ == "__main__":
     # read catalog
     vot = votable.parse_single_table(catalog_fn)
     catalog = vot.to_table()
-    print(catalog)
-    print(source_id)
+    # print(catalog)
+    # print(source_id)
     right_source = (catalog['NUMBER'] == source_id)
     source_data = catalog[right_source][0]
-    print("SOURCE-coord: ", source_data['X_IMAGE'], source_data['Y_IMAGE'])
+    print("Assuming SOURCE-coord: ", source_data['X_IMAGE'], source_data['Y_IMAGE'])
 
     # sys.exit(-1)
 
@@ -57,11 +71,13 @@ if __name__ == "__main__":
     surfprofile_csv = output_basename + "_profile.csv"
 
     if (rerun and os.path.isfile(surfprofile_csv)):
+        print("Skipping profile generation, reading instead from %s" % (surfprofile_csv))
         df = pandas.read_csv(surfprofile_csv)
     else:
         print("Preparing ellipse fit")
         dummy_fn = output_basename+"_maskcheck.fits"
         pyfits.PrimaryHDU(data=img_masked.filled(0)).writeto(dummy_fn, overwrite=True)
+        print("wrote mask-check image to %s" % (dummy_fn))
 
         # prepare ellipse fitting
         geo = photutils.isophote.EllipseGeometry(
@@ -70,24 +86,24 @@ if __name__ == "__main__":
             sma=10, eps=0.01, pa=0,
         )
         # geo.find_center(img_masked)
-        print(geo)
+        # print(geo)
         ellipse = photutils.isophote.Ellipse(img_masked, geometry=geo)
-        print("ellipse:", ellipse)
+        # print("ellipse:", ellipse)
 
         # df = pandas.read_csv("surfprofile.csv")
-        print("Fitting image")
+        print("Fitting image (min_sma=%.2f, max_sma=%s)" % (args.minsma, "%.2f" % args.maxsma if args.maxsma is not None else "NO_LIMIT"))
         isophot_list = ellipse.fit_image(
             # integrmode='median',
             sclip=3.0, nclip=3, fflag=0.7,
-            maxsma=150,
-            minsma=5,
+            maxsma=args.maxsma,
+            minsma=args.minsma,
         )
         print("done fitting")
         print(isophot_list.to_table())
 
         df = isophot_list.to_table().to_pandas()
         df.to_csv(surfprofile_csv)
-        print("Saved surface brightness profile as CSV")
+        print("Saved surface brightness profile as CSV (%s)" % (surfprofile_csv))
 
 
     #
