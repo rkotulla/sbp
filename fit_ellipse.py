@@ -29,6 +29,8 @@ if __name__ == "__main__":
                          help="base filename for all output")
     cmdline.add_argument("-r", "--rerun", dest='rerun', default=False, action='store_true',
                          help="rerun using profile generated in prior run")
+    cmdline.add_argument("--srclist", dest='srclist', default=None,
+                         help="list of source-ids to include in valid fitting area")
     #
     # optional parameters affecting ellipse fitting and profile generation
     #
@@ -41,7 +43,7 @@ if __name__ == "__main__":
 
     fn = args.input_fn
     catalog_fn = args.catalog_fn
-    source_id = args.source_id
+    source_id = args.source_id #[int(id) for id in args.source_id.split(",")]
     segm_fn = args.segmentation_fn
     output_basename = args.output_basename
 
@@ -54,6 +56,11 @@ if __name__ == "__main__":
     segm_hdu = pyfits.open(segm_fn)
     segm = segm_hdu[0].data
     use_for_fit = ((segm == 0) | (segm == source_id)) & numpy.isfinite(img)
+    if (args.srclist is not None):
+        srclist = [int(id) for id in args.srclist.split(",")]
+        for id in srclist:
+            use_for_fit |= (segm == id)
+
     img_masked.mask = ~use_for_fit
 
     # read catalog
