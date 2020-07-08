@@ -9,6 +9,7 @@ import pandas
 import photutils
 import photutils.isophote
 from astropy.io import votable
+import astropy.wcs
 import argparse
 
 if __name__ == "__main__":
@@ -125,6 +126,34 @@ image""", file=ds9_reg)
         for index, e in df.iterrows():
             # print(e)
             print("ellipse(%f,%f,%f,%f,%f)" % (e['x0'], e['y0'], e['sma'], (1.-e['ellipticity'])*e['sma'], e['pa']),
+                  file=ds9_reg)
+
+    # now write the region file again, this time using WCS instead of pixel information
+    hdr = img_hdu[0].header
+    try:
+        pixelscale = numpy.hypot(hdr['CD1_1'], hdr['CD1_2']) * 3600. # in arcsec/pixel
+    except:
+        try:
+            pixelscale = hdr['CDELT1'] * 3600
+        except:
+            pixelscale = 1.
+            pass
+
+    # convert all x/y into ra/dec
+    wcs = astropy.wcs.WCS(hdr)
+    (ra0,dec0) = wcs.all_pix2world(df['x0'], df['y0'], 0)
+    # print(ra_dec)
+    df['ra0'] = ra0 #_dec[:,0]
+    df['dec0'] = dec0 #ra_dec[:,1]
+    ds9_reg_fn = output_basename + "_ellipses_wcs.reg"
+    with open(ds9_reg_fn, "w") as ds9_reg:
+        print("""\
+# Region file format: DS9 version 4.1
+global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1
+fk5""", file=ds9_reg)
+        for index, e in df.iterrows():
+            # print(e)
+            print('ellipse(%f,%f,%f",%f",%f)' % (e['ra0'], e['dec0'], e['sma']*pixelscale, (1.-e['ellipticity'])*e['sma']*pixelscale, e['pa']),
                   file=ds9_reg)
 
 
