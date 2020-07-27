@@ -74,6 +74,7 @@ if __name__ == "__main__":
     print("Assuming SOURCE-coord: ", source_data['X_IMAGE'], source_data['Y_IMAGE'])
 
     # sys.exit(-1)
+    n_attempts = 1
 
     rerun = args.rerun
     surfprofile_csv = output_basename + "_profile.csv"
@@ -93,30 +94,64 @@ if __name__ == "__main__":
             y0 = source_data['Y_IMAGE'],
             sma=10, eps=0.01, pa=0,
         )
-        # geo.find_center(img_masked)
+        geo.find_center(img_masked)
         # print(geo)
         ellipse = photutils.isophote.Ellipse(img_masked, geometry=geo)
         # print("ellipse:", ellipse)
 
-        # df = pandas.read_csv("surfprofile.csv")
-        print("Fitting image (min_sma=%.2f, max_sma=%s)" % (args.minsma, "%.2f" % args.maxsma if args.maxsma is not None else "NO_LIMIT"))
-        isophot_list = ellipse.fit_image(
-            # integrmode='median',
-            sclip=3.0, nclip=3, fflag=0.7,
-            maxsma=args.maxsma,
-            minsma=args.minsma,
-        )
-        print("done fitting")
-        print(isophot_list.to_table())
+        sma_start = args.minsma
+        for a in range(1): #n_attempts):
+            # repeat this until we run out of attmepts or get a complete profile
 
-        df = isophot_list.to_table().to_pandas()
-        df.to_csv(surfprofile_csv)
-        print("Saved surface brightness profile as CSV (%s)" % (surfprofile_csv))
+            # df = pandas.read_csv("surfprofile.csv")
+            print("Fitting image (min_sma=%.2f, max_sma=%s)" % (sma_start, "%.2f" % args.maxsma if args.maxsma is not None else "NO_LIMIT"))
+            isophot_list = ellipse.fit_image(
+                # integrmode='median',
+                sclip=3.0, nclip=3, fflag=0.9,
+                sma0=sma_start,
+                maxsma=args.maxsma,
+                minsma=args.minsma,
+                step=0.1,
+            )
+            print("done fitting")
+            print(isophot_list.to_table())
+            df = isophot_list.to_table().to_pandas()
+            df.info()
 
+            df.to_csv(surfprofile_csv+"%d"%a)
+            print("Saved surface brightness profile as CSV (%s)" % (surfprofile_csv))
+
+            # check if any of the values are NaN - indicating a problem
+            bad_data = df.isnull().any(axis=1)
+            print(bad_data)
+            if (len(bad_data.index) > 0):
+                # now find the index of the first bad entry
+                first_bad = numpy.min(df.index[bad_data])
+                print(first_bad)
+                print(df.iloc[first_bad])
+
+                sma_start = df.iloc[first_bad]['sma'] * 1.1
+                print("Restarting profile generation at radius sma=%f" % (sma_start))
+
+            else:
+                print("Profile generation completed without issues")
+                break
+
+            # break
 
     #
     # convert all ellipses into ds9 format
     #
+    fit_result_colors = {
+        0: 'color=green',
+        1: 'color=yellow',
+        2: 'color=orange',
+        3: 'color=orange',
+        4: 'color=blue',
+        5: 'color=red width=3',
+        -1: ''
+    }
+
     ds9_reg_fn = output_basename + "_ellipses.reg"
     with open(ds9_reg_fn, "w") as ds9_reg:
         print("""\
@@ -125,7 +160,12 @@ global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=
 image""", file=ds9_reg)
         for index, e in df.iterrows():
             # print(e)
-            print("ellipse(%f,%f,%f,%f,%f)" % (e['x0'], e['y0'], e['sma'], (1.-e['ellipticity'])*e['sma'], e['pa']),
+            print("ellipse(%f,%f,%f,%f,%f) # %s" % (
+                e['x0'], e['y0'],
+                e['sma'], (1.-e['ellipticity'])*e['sma'],
+                e['pa'],
+                fit_result_colors[e['stop_code']]
+                ),
                   file=ds9_reg)
 
     # now write the region file again, this time using WCS instead of pixel information
@@ -153,7 +193,12 @@ global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=
 fk5""", file=ds9_reg)
         for index, e in df.iterrows():
             # print(e)
-            print('ellipse(%f,%f,%f",%f",%f)' % (e['ra0'], e['dec0'], e['sma']*pixelscale, (1.-e['ellipticity'])*e['sma']*pixelscale, e['pa']),
+            print('ellipse(%f,%f,%f",%f",%f) # %s' % (
+                e['ra0'], e['dec0'],
+                e['sma']*pixelscale, (1.-e['ellipticity'])*e['sma']*pixelscale,
+                e['pa'],
+                fit_result_colors[e['stop_code']]
+            ),
                   file=ds9_reg)
 
 
