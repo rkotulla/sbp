@@ -153,6 +153,9 @@ if __name__ == "__main__":
     fn = sys.argv[1]
 
     bn,ext = os.path.splitext(fn)
+    if (bn.endswith("_profile")):
+        bn = bn[:-8]
+
     df = pandas.read_csv(fn)
     make_plot(df, pixelscale=0.168, zeropoint=26., basename=bn)
 
